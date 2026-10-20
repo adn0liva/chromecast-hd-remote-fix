@@ -1,151 +1,151 @@
-# Chromecast HD: el control remoto se desconecta y no vuelve
+# Chromecast HD: the remote disconnects and never comes back
 
-> **English version:** [README.en.md](README.en.md)
+> **Versión en español:** [README.es.md](README.es.md)
 
-Arreglo automático para el **Chromecast con Google TV (HD)** cuando el control remoto
-Bluetooth deja de funcionar y solo vuelve borrando los datos de la app Bluetooth y
-vinculándolo de nuevo.
+Automatic fix for the **Chromecast with Google TV (HD)** when the Bluetooth remote stops
+working and only comes back after clearing the Bluetooth app's data and pairing it again.
 
-## Síntomas
+## Symptoms
 
-- El control deja de responder (flechas, OK, Home, voz). A veces varias veces al día.
-- Reiniciar el Chromecast no siempre lo arregla.
-- Lo que sí funciona, pero es cansador: Ajustes → Apps → Bluetooth → **Borrar datos** y
-  volver a vincular el control.
-- Los botones de volumen y encendido de la tele sí funcionan (esos van por infrarrojo).
+- The remote stops responding (arrows, OK, Home, voice). Sometimes several times a day.
+- Restarting the Chromecast doesn't always fix it.
+- What does work, but gets tiring: Settings → Apps → Bluetooth → **Clear data** and pair
+  the remote again.
+- The TV power and volume buttons keep working (those use infrared).
 
-## La causa
+## The cause
 
-El control se desconecta solo de vez en cuando (es normal en controles Bluetooth de bajo
-consumo). Después de eso, el Chromecast debería quedar **escuchando** al control para que
-se reconecte apenas presionas un botón: lo hace anotándolo en una lista del chip
-Bluetooth (la *LE accept list*).
+The remote disconnects on its own every now and then (normal for low-energy Bluetooth
+remotes). After that, the Chromecast should keep **listening** for the remote so it can
+reconnect as soon as you press a button. It does this by adding the remote to a list in
+the Bluetooth chip (the *LE accept list*).
 
-En el Chromecast HD esa lista a veces **queda vacía** tras la desconexión. El control
-sigue vinculado, pero el Chromecast ya no acepta su reconexión. Por eso:
+On the Chromecast HD that list is sometimes **left empty** after the disconnect. The
+remote is still paired, but the Chromecast no longer accepts its reconnection. That's
+why:
 
-- **Borrar los datos de Bluetooth** lo arreglaba: reinicia el Bluetooth (eso es lo que
-  arregla) y además borra la vinculación (eso sobraba).
-- **Reiniciar solo el Bluetooth** basta, y no hay que volver a vincular.
+- **Clearing the Bluetooth data** fixed it: it restarts Bluetooth (that's the part that
+  fixes it) and also deletes the pairing (that part was unnecessary).
+- **Restarting only Bluetooth** is enough, and you don't have to pair again.
 
-Cómo se ve en `dumpsys bluetooth_manager` (control vinculado, desconectado y fuera de la
-lista):
+What it looks like in `dumpsys bluetooth_manager` (remote paired, disconnected and not
+in the list):
 
 ```
 shim::legacy::hid   0: addr:xx:xx:xx:xx:yy:zz ... state:BTHH_CONN_STATE_DISCONNECTED
 shim::acl Shadow le accept list              size:0   controller_max_size:255
 ```
 
-Y la pista de que el stack quedó desincronizado, al apagar el Bluetooth:
+And the hint that the stack got out of sync, when Bluetooth is turned off:
 
 ```
 acl.cc:189 Remove: Unknown device being removed from acceptlist:xx:xx:xx:xx:yy:zz
 ```
 
-En el equipo donde se diagnosticó, el control llevaba **19 días** sin poder reconectarse
-en ese estado. Al reiniciar solo el Bluetooth, la lista volvió a tener el control
-(`size:1`) y se reconectó con la primera pulsación.
+On the device where this was diagnosed, the remote had been unable to reconnect for
+**19 days** in that state. After restarting only Bluetooth, the list contained the
+remote again (`size:1`) and it reconnected on the first button press.
 
-**Descartado** en ese diagnóstico: pilas del control (nivel bueno), firmware del control
-(26.7), Wi‑Fi (5 GHz, buena señal), hub USB‑C con Ethernet (pasaba igual por Wi‑Fi) y
-cuelgues del Bluetooth (0 crashes). Un Chromecast con Google TV **4K** en la misma casa
-nunca tuvo el problema.
+**Ruled out** in that diagnosis: remote batteries (good level), remote firmware (26.7),
+Wi‑Fi (5 GHz, good signal), a USB‑C hub with Ethernet (it happened on Wi‑Fi too) and
+Bluetooth crashes (0 crashes). A Chromecast with Google TV **4K** in the same house never
+had the problem.
 
-## La solución: "Vigilante del control"
+## The fix: "Vigilante del control" (remote watchdog)
 
-Una app mínima, sin pantalla, que:
+A minimal app with no UI that:
 
-1. **Arranca sola** cada vez que el Chromecast enciende.
-2. Cada **30 segundos** lee `dumpsys bluetooth_manager`.
-3. Si el control está **vinculado, desconectado y la lista está vacía** en **dos
-   revisiones seguidas**, reinicia el Bluetooth (como máximo una vez cada 3 minutos).
-4. Deja un registro de lo que hace.
+1. **Starts on its own** every time the Chromecast boots.
+2. Reads `dumpsys bluetooth_manager` every **30 seconds**.
+3. If the remote is **paired, disconnected and the list is empty** in **two checks in a
+   row**, it restarts Bluetooth (at most once every 3 minutes).
+4. Keeps a log of what it does.
 
-En el uso normal no notas nada: la falla aparece cuando el control queda inactivo, y el
-vigilante la corrige antes de que vuelvas a tomarlo.
+In everyday use you won't notice anything: the fault shows up while the remote is idle,
+and the watchdog fixes it before you pick the remote up again.
 
-Detalles técnicos:
+Technical details:
 
-- Necesita el permiso `android.permission.DUMP` para leer el estado del Bluetooth. Ese
-  permiso no se puede pedir desde la app: se otorga **una vez por ADB** y queda guardado
-  aunque reinicies.
-- Reinicia el Bluetooth con `BluetoothAdapter.disable()/enable()`. Desde Android 13 eso
-  solo está permitido para apps que apuntan a API 32 o menos; por eso la app declara
-  `targetSdkVersion 30` a propósito.
-- Solo el sistema y ADB pueden enviarle órdenes (el receptor exige el permiso `DUMP`);
-  otras apps no pueden hacerle reiniciar el Bluetooth.
-- No necesita root, ni internet, ni un computador encendido.
+- It needs the `android.permission.DUMP` permission to read the Bluetooth state. That
+  permission can't be requested from the app: it's granted **once via ADB** and survives
+  reboots.
+- It restarts Bluetooth with `BluetoothAdapter.disable()/enable()`. Since Android 13 that
+  is only allowed for apps targeting API 32 or lower, so the app deliberately declares
+  `targetSdkVersion 30`.
+- Only the system and ADB can send it commands (the receiver requires the `DUMP`
+  permission); other apps can't make it restart Bluetooth.
+- It needs no root, no internet and no computer left running.
 
-## Instalación sin IA (paso a paso)
+## Installation without AI (step by step)
 
-Necesitas un computador en la **misma red** que el Chromecast. Tarda unos 10 minutos.
+You need a computer on the **same network** as the Chromecast. It takes about 10 minutes.
 
-### 1. Instalar ADB en el computador
+### 1. Install ADB on the computer
 
 - **macOS:** `brew install android-platform-tools`
-- **Windows / Linux:** descarga las *SDK Platform-Tools* desde
-  <https://developer.android.com/tools/releases/platform-tools> y descomprímelas.
+- **Windows / Linux:** download the *SDK Platform-Tools* from
+  <https://developer.android.com/tools/releases/platform-tools> and unzip them.
 
-### 2. Activar la depuración en el Chromecast
+### 2. Enable debugging on the Chromecast
 
-1. **Ajustes → Sistema → Información → Compilación del SO Android TV**: presiona OK
-   **7 veces** hasta que diga que eres desarrollador.
-2. **Ajustes → Sistema → Opciones para desarrolladores**: activa **Depuración por USB**
-   y **Depuración inalámbrica**.
+1. **Settings → System → About → Android TV OS build**: press OK **7 times** until it
+   says you're a developer.
+2. **Settings → System → Developer options**: turn on **USB debugging** and **Wireless
+   debugging**.
 
-> **Si tu Chromecast está conectado por cable de red**, la depuración inalámbrica aparece
-> deshabilitada: Android solo la permite por **Wi‑Fi**. Desconecta el cable mientras
-> instalas; después puedes volver a conectarlo.
+> **If your Chromecast is connected with a network cable**, wireless debugging shows up
+> disabled: Android only allows it over **Wi‑Fi**. Unplug the cable while you install;
+> you can plug it back in afterwards.
 
-> Si el control no te funciona para navegar los menús, usa la app **Google Home** o
-> **Google TV** del teléfono como control, o el control de la tele (HDMI‑CEC).
+> If the remote doesn't work for navigating the menus, use the **Google Home** or
+> **Google TV** phone app as a remote, or your TV's remote (HDMI‑CEC).
 
-### 3. Vincular el computador con el Chromecast
+### 3. Pair the computer with the Chromecast
 
-Entra a **Depuración inalámbrica**. Vas a ver **dos puertos distintos**, y es fácil
-confundirlos:
+Open **Wireless debugging**. You'll see **two different ports**, and they're easy to mix
+up:
 
-| Dónde aparece | Para qué sirve |
+| Where it's shown | What it's for |
 | --- | --- |
-| Pantalla principal de *Depuración inalámbrica* | **Conectar** (`adb connect`) |
-| Ventana *Vincular dispositivo con código de vinculación* (junto al código de 6 dígitos) | **Vincular** (`adb pair`), solo una vez |
+| Main *Wireless debugging* screen | **Connecting** (`adb connect`) |
+| *Pair device with pairing code* dialog (next to the 6-digit code) | **Pairing** (`adb pair`), only once |
 
-Con la ventana de vinculación abierta:
+With the pairing dialog open:
 
 ```bash
-adb pair IP:PUERTO_DE_VINCULACION CODIGO
-adb connect IP:PUERTO_PRINCIPAL
+adb pair IP:PAIRING_PORT CODE
+adb connect IP:MAIN_PORT
 adb devices
 ```
 
-`adb devices` debe mostrar el Chromecast como `device`.
+`adb devices` should list the Chromecast as `device`.
 
-> **No ejecutes `adb connect` contra el puerto de vinculación.** Ese servicio atiende una
-> conexión a la vez: queda tomado y la vinculación con el código se cuelga.
+> **Don't run `adb connect` against the pairing port.** That service handles one
+> connection at a time: it gets taken and pairing with the code hangs.
 
-### 4. (Opcional) Confirmar que tienes esta falla
+### 4. (Optional) Confirm you have this fault
 
-Cuando el control **no** esté funcionando:
+While the remote is **not** working:
 
 ```bash
 adb shell dumpsys bluetooth_manager | grep -E "BTHH_CONN_STATE|Shadow le accept list"
 ```
 
-Si ves `BTHH_CONN_STATE_DISCONNECTED` y `Shadow le accept list ... size:0`, es esta falla.
-Para comprobar que reiniciar el Bluetooth lo arregla:
+If you see `BTHH_CONN_STATE_DISCONNECTED` and `Shadow le accept list ... size:0`, it's this
+fault. To check that restarting Bluetooth fixes it:
 
 ```bash
 adb shell cmd bluetooth_manager disable
 adb shell cmd bluetooth_manager enable
 ```
 
-Presiona dos veces un botón del control: debería volver a funcionar (la primera pulsación
-lo despierta y lo reconecta; la segunda ya llega a la tele).
+Press a button on the remote twice: it should work again (the first press wakes it up
+and reconnects it; the second one reaches the TV).
 
-### 5. Instalar la app
+### 5. Install the app
 
-Descarga `rcu-watchdog.apk` desde la sección **Releases** de este repositorio (o
-compílalo, ver más abajo) y ejecuta:
+Download `rcu-watchdog.apk` from this repository's **Releases** section (or build it,
+see below) and run:
 
 ```bash
 adb install -r rcu-watchdog.apk
@@ -153,124 +153,127 @@ adb shell pm grant com.adan.rcuwatchdog android.permission.DUMP
 adb shell am broadcast -a com.adan.rcuwatchdog.START -n com.adan.rcuwatchdog/.BootReceiver -f 0x20
 ```
 
-El tercer comando la arranca por primera vez. Desde ahí arranca sola en cada encendido.
+The third command starts it for the first time. From then on it starts by itself on
+every boot.
 
-### 6. Verificar
+### 6. Verify
 
 ```bash
 adb shell pidof com.adan.rcuwatchdog
 adb shell cat /sdcard/Android/data/com.adan.rcuwatchdog/files/vigilante.log
 ```
 
-Debe mostrar un número de proceso y un log con `vigilante iniciado` y `estado: ok`.
+You should get a process number and a log containing `vigilante iniciado` (watchdog
+started) and `estado: ok` (status: ok).
 
-Para probar que puede reiniciar el Bluetooth (el control se desconecta un momento;
-vuelve al presionar un botón):
+To test that it can restart Bluetooth (the remote disconnects for a moment and comes
+back when you press a button):
 
 ```bash
 adb shell am broadcast -a com.adan.rcuwatchdog.TEST_RESTART -n com.adan.rcuwatchdog/.BootReceiver
 ```
 
-En el log aparece `prueba manual -> reinicio Bluetooth` y luego `tras reinicio: ok`.
+The log shows `prueba manual -> reinicio Bluetooth` (manual test -> Bluetooth restart)
+followed by `tras reinicio: ok` (after restart: ok).
 
-Listo. Puedes desactivar la depuración si quieres; la app no la necesita. (En este modelo
-la depuración inalámbrica se apaga sola al reiniciar.)
+Done. You can turn debugging off if you like; the app doesn't need it. (On this model,
+wireless debugging turns itself off on reboot anyway.)
 
-## Instalación con ayuda de Claude
+## Installation with help from Claude
 
-Con [Claude Code](https://claude.com/claude-code) en un computador de la misma red,
-activa la depuración (paso 2), abre la ventana de vinculación y pídele algo así:
+With [Claude Code](https://claude.com/claude-code) on a computer on the same network,
+enable debugging (step 2), open the pairing dialog and ask something like:
 
-> Tengo un Chromecast HD con el problema que describe el README de este repositorio
-> (`<URL del repo>`). Lee el README. Conéctate por ADB a mi Chromecast: vinculación en
-> `IP:PUERTO` con el código `CODIGO`, conexión en `IP:PUERTO_PRINCIPAL`. Antes de instalar
-> nada, verifica con `dumpsys bluetooth_manager` si tengo esta falla y explícame lo que
-> encuentres. Si la tengo, instala la app siguiendo "Instalación sin IA" y verifica que
-> quedó corriendo.
+> I have a Chromecast HD with the problem described in this repository's README
+> (`<repo URL>`). Read the README. Connect to my Chromecast over ADB: pairing at
+> `IP:PORT` with code `CODE`, connection at `IP:MAIN_PORT`. Before installing anything,
+> check with `dumpsys bluetooth_manager` whether I have this fault and explain what you
+> find. If I do, install the app following "Installation without AI" and verify it's
+> running.
 
-Así se resolvió originalmente: diagnóstico con `dumpsys` y `logcat`, prueba de reiniciar
-solo el Bluetooth, un script de vigilancia y, al final, esta app para que sobreviviera
-a los reinicios.
+That's how it was solved originally: diagnosis with `dumpsys` and `logcat`, a test
+restarting only Bluetooth, a watchdog script and, finally, this app so it would survive
+reboots.
 
-## Ver el estado más adelante
+## Checking the status later
 
 ```bash
-./scripts/estado.sh IP:PUERTO_PRINCIPAL
+./scripts/estado.sh IP:MAIN_PORT
 ```
 
-Muestra si la app corre, si tiene el permiso, el estado del control y el log. Las líneas
-`control desconectado y fuera de la lista de escucha -> reinicio Bluetooth` son las veces
-que el vigilante arregló la falla solo.
+Shows whether the app is running, whether it has the permission, the remote's state and
+the log (labels are in Spanish). Lines reading
+`control desconectado y fuera de la lista de escucha -> reinicio Bluetooth` (remote
+disconnected and out of the accept list -> Bluetooth restart) are the times the watchdog
+fixed the fault on its own.
 
-Si el Chromecast se reinició, hay que volver a vincular (paso 3).
+If the Chromecast has rebooted, you need to pair again (step 3).
 
-## Compilar desde el código
+## Building from source
 
-Necesitas el Android SDK (build-tools y una plataforma) y un JDK 17 o superior. Con
-[Android Studio](https://developer.android.com/studio) instalado ya tienes ambos.
+You need the Android SDK (build-tools and a platform) and JDK 17 or newer. With
+[Android Studio](https://developer.android.com/studio) installed you already have both.
 
 ```bash
 ./app/build.sh
 ```
 
-Genera `app/build/rcu-watchdog.apk` sin Gradle (`javac` → `d8` → `aapt2` → `zipalign` →
-`apksigner`). La primera vez crea una llave de firma propia en `app/signing.jks`, que no
-se sube al repositorio. **Guárdala**: para actualizar la app instalada hay que firmar con
-la misma llave. Con otra llave, Android obliga a desinstalar primero y a repetir el
-`pm grant`.
+It produces `app/build/rcu-watchdog.apk` without Gradle (`javac` → `d8` → `aapt2` →
+`zipalign` → `apksigner`). The first time, it creates your own signing key at
+`app/signing.jks`, which is not committed to the repository. **Keep it**: to update the
+installed app you must sign with the same key. With a different key, Android makes you
+uninstall first and repeat the `pm grant`.
 
-Si tu SDK o JDK están en otra ruta, define `ANDROID_HOME` y `JAVA_HOME`.
+If your SDK or JDK live somewhere else, set `ANDROID_HOME` and `JAVA_HOME`.
 
-## Desinstalar
+## Uninstalling
 
 ```bash
 adb uninstall com.adan.rcuwatchdog
 ```
 
-O desde **Ajustes → Apps → Ver todas las apps → Vigilante del control → Desinstalar**.
+Or from **Settings → Apps → See all apps → Vigilante del control → Uninstall**.
 
-## Plan B sin computador
+## Plan B without a computer
 
-Si algún día el control vuelve a fallar y no tienes la app ni un computador a mano:
+If the remote ever fails again and you don't have the app or a computer at hand:
 
-**Ajustes → Apps → Ver todas las apps → Mostrar apps del sistema → Bluetooth →
-Forzar detención** (no "Borrar datos").
+**Settings → Apps → See all apps → Show system apps → Bluetooth → Force stop** (not
+"Clear data").
 
-Reinicia el Bluetooth sin perder la vinculación. Después presiona dos veces un botón del
-control.
+That restarts Bluetooth without losing the pairing. Then press a button on the remote
+twice.
 
-## Cosas a tener en cuenta
+## Things to keep in mind
 
-- **No uses "Forzar detención" sobre *Vigilante del control*.** Android no entrega el
-  aviso de encendido a una app detenida a la fuerza: dejaría de arrancar sola hasta que
-  la vuelvas a lanzar con el `am broadcast ... START` del paso 5.
-- Al reiniciar el Bluetooth se cortan por unos segundos **todos** los dispositivos
-  Bluetooth del Chromecast (audífonos, gamepads), no solo el control.
-- Si el Chromecast está en **reposo profundo**, el vigilante se pausa con él. Si alguna
-  vez el control no logra encenderlo, enciende la tele con su propio control y espera un
-  minuto.
-- Probado en un **Chromecast HD**, Android TV 14, compilación `UTTC.250917.004`, con el
-  control "Chromecast Remote" (firmware 26.7). El nombre del control está fijo en el
-  código (`REMOTE_NAME` en `WatchdogService.java`).
-- Si una actualización de Google corrige la falla, el vigilante simplemente nunca va a
-  actuar.
+- **Don't use "Force stop" on *Vigilante del control*.** Android doesn't deliver the
+  boot notification to a force-stopped app: it would stop starting on its own until you
+  launch it again with the `am broadcast ... START` from step 5.
+- Restarting Bluetooth briefly drops **all** of the Chromecast's Bluetooth devices
+  (headphones, gamepads), not just the remote.
+- If the Chromecast is in **deep standby**, the watchdog pauses along with it. If the
+  remote ever can't wake it up, turn the TV on with its own remote and wait a minute.
+- Tested on a **Chromecast HD**, Android TV 14, build `UTTC.250917.004`, with the
+  "Chromecast Remote" (firmware 26.7). The remote's name is hard-coded
+  (`REMOTE_NAME` in `WatchdogService.java`).
+- If a Google update fixes the fault, the watchdog will simply never act.
 
-## Estructura
+## Layout
 
 ```
 app/
-  AndroidManifest.xml        manifiesto (targetSdk 30, permisos, arranque al encender)
-  build.sh                   compilación sin Gradle
+  AndroidManifest.xml        manifest (targetSdk 30, permissions, start on boot)
+  build.sh                   build without Gradle
   src/com/adan/rcuwatchdog/
-    BootReceiver.java        arranca el servicio al encender (o por orden de adb)
-    WatchdogService.java     revisión cada 30 s y reinicio del Bluetooth
+    BootReceiver.java        starts the service on boot (or when told by adb)
+    WatchdogService.java     30-second check and Bluetooth restart
 scripts/
-  estado.sh                  estado y log de la app vía adb
-  rcu_watchdog.sh            misma lógica como script de shell (sin instalar app;
-                             vive hasta el próximo reinicio del Chromecast)
+  estado.sh                  app status and log via adb
+  rcu_watchdog.sh            same logic as a shell script (no app install;
+                             lives until the Chromecast's next reboot)
 ```
 
-## Licencia
+## License
 
-[MIT](LICENSE). Úsalo bajo tu propio riesgo: la app reinicia el Bluetooth del
-Chromecast y no tiene garantía de ningún tipo.
+[MIT](LICENSE). Use it at your own risk: the app restarts the Chromecast's Bluetooth and
+comes with no warranty of any kind.
