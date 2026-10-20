@@ -1,15 +1,10 @@
 # Chromecast HD: el control remoto se desconecta y no vuelve
 
+> **English version:** [README.en.md](README.en.md)
+
 Arreglo automático para el **Chromecast con Google TV (HD)** cuando el control remoto
 Bluetooth deja de funcionar y solo vuelve borrando los datos de la app Bluetooth y
 vinculándolo de nuevo.
-
-> **English TL;DR** — On the Chromecast with Google TV (HD), Android TV 14, the Bluetooth
-> stack sometimes fails to re-add the remote to the controller's LE accept list after the
-> remote disconnects, so the remote stays paired but can never reconnect. Restarting only
-> Bluetooth fixes it without re-pairing. This repo contains a tiny app (no UI) that starts
-> on boot, detects that exact state every 30 s via `dumpsys bluetooth_manager` and restarts
-> Bluetooth. Install it once with ADB (see "Instalación sin IA"); no root needed.
 
 ## Síntomas
 
