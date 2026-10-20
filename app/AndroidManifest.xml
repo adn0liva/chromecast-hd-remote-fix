@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Vigilante del control remoto del Chromecast HD.
+  targetSdk 30 a propósito: desde Android 13 solo las apps que apuntan a API <= 32
+  pueden apagar/encender el Bluetooth con BluetoothAdapter.disable()/enable().
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.adan.rcuwatchdog"
+    android:versionCode="2"
+    android:versionName="1.1">
+
+    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="30" />
+
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <!-- Se otorga una vez por adb: pm grant com.adan.rcuwatchdog android.permission.DUMP -->
+    <uses-permission android:name="android.permission.DUMP" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <application
+        android:label="Vigilante del control"
+        android:allowBackup="false">
+
+        <!-- android:permission="DUMP": solo el sistema y adb (shell) pueden enviarle
+             broadcasts; otras apps no pueden disparar reinicios de Bluetooth. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="com.adan.rcuwatchdog.START" />
+                <action android:name="com.adan.rcuwatchdog.TEST_RESTART" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".WatchdogService"
+            android:exported="false" />
+    </application>
+</manifest>
