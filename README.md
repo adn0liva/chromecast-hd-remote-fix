@@ -274,3 +274,8 @@ scripts/
   rcu_watchdog.sh            misma lógica como script de shell (sin instalar app;
                              vive hasta el próximo reinicio del Chromecast)
 ```
+
+## Licencia
+
+[MIT](LICENSE). Úsalo bajo tu propio riesgo: la app reinicia el Bluetooth del
+Chromecast y no tiene garantía de ningún tipo.
