@@ -76,6 +76,23 @@ Detalles técnicos:
   otras apps no pueden hacerle reiniciar el Bluetooth.
 - No necesita root, ni internet, ni un computador encendido.
 
+## Resultados
+
+Medido en el Chromecast HD donde se diagnosticó el problema, durante 8 días (20 al 28 de
+octubre de 2026), con el log de la propia app:
+
+| | |
+| --- | --- |
+| Fallas corregidas solas | **66** (unas 8 al día, hasta 17 en un solo día) |
+| Correcciones que funcionaron | **66 de 66**: después de cada reinicio el Chromecast volvió a escuchar al control (`tras reinicio: ok`) |
+| Falsas alarmas evitadas | 2: la falla se resolvió sola en menos de 30 s y la doble revisión evitó un reinicio innecesario |
+| Sobrevivió a un reinicio del Chromecast | Sí, arrancó sola |
+| Crashes de Bluetooth | 0 |
+
+Sin la app, el control habría dejado de funcionar unas 66 veces esa semana, cada una con
+la rutina de borrar datos y volver a vincular. En la práctica no se notó nada: la falla
+aparece mientras el control está inactivo y se corrige antes de volver a tomarlo.
+
 ## Instalación sin IA (paso a paso)
 
 Necesitas un computador en la **misma red** que el Chromecast. Tarda unos 10 minutos.

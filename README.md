@@ -76,6 +76,23 @@ Technical details:
   permission); other apps can't make it restart Bluetooth.
 - It needs no root, no internet and no computer left running.
 
+## Results
+
+Measured on the Chromecast HD where the problem was diagnosed, over 8 days (October 20–28,
+2026), from the app's own log:
+
+| | |
+| --- | --- |
+| Faults fixed automatically | **66** (about 8 per day, up to 17 in a single day) |
+| Fixes that worked | **66 of 66**: after every restart the Chromecast was listening for the remote again (`tras reinicio: ok`) |
+| False alarms avoided | 2: the fault cleared on its own within 30 s, and the two-check rule skipped an unnecessary restart |
+| Survived a Chromecast reboot | Yes, it started on its own |
+| Bluetooth crashes | 0 |
+
+Without the app, the remote would have stopped working roughly 66 times that week, each
+time needing the "clear data and pair again" routine. In practice nothing was noticeable:
+the fault shows up while the remote is idle and gets fixed before it's picked up again.
+
 ## Installation without AI (step by step)
 
 You need a computer on the **same network** as the Chromecast. It takes about 10 minutes.
