@@ -272,6 +272,37 @@ control.
 - Si una actualización de Google corrige la falla, el vigilante simplemente nunca va a
   actuar.
 
+## Problema relacionado: el control no acepta la configuración de botones
+
+Un problema distinto, visto en el mismo Chromecast: después de cambiar de tele, el
+control se quedó con los códigos infrarrojos de la tele anterior. El volumen y la entrada
+no hacían nada en la tele nueva, y **Ajustes → Control remoto y accesorios → Configura
+botones de control remoto** se quedaba pegado, ya sea en un círculo de carga o en "Usa el
+control remoto de Chromecast HD para ir a la configuración" con el botón *Reintentar*.
+
+El log mostraba que era el propio control el que rechazaba la configuración nueva (`3` =
+escritura no permitida):
+
+```
+Axel.BleConnection: Failed to write characteristic d343bfc1-5a21-4f05-bc7d-af01f617b664 to xx:xx:xx:xx:yy:zz: 3
+Axel.IrRemote: Upload '...' to xx:xx:xx:xx:yy:zz completed unsuccessfully
+```
+
+Siguió pasando justo después de reiniciar el Chromecast, antes de que el vigilante
+reiniciara el Bluetooth una sola vez, así que no lo causa el vigilante.
+
+**Solución:** desvincular el control y volver a vincularlo (mantener **Atrás + Inicio**
+hasta que parpadee la luz) y repetir *Configura botones de control remoto*. Tras la
+revinculación, la grabación funcionó al primer intento (`completed successfully`).
+Durante ese asistente usa el control del Chromecast: necesita las pulsaciones de ese
+control.
+
+Para comprobar si te pasa esto:
+
+```bash
+adb logcat -d | grep -E "Axel\.(IrRemote|BleConnection)"
+```
+
 ## Estructura
 
 ```

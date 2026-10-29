@@ -275,6 +275,35 @@ twice.
   (`REMOTE_NAME` in `WatchdogService.java`).
 - If a Google update fixes the fault, the watchdog will simply never act.
 
+## Related: the remote won't accept the button setup
+
+A separate problem seen on the same Chromecast: after switching TVs, the remote kept the
+old TV's infrared codes. Volume and input did nothing on the new TV, and
+**Settings → Remotes & Accessories → Set up remote buttons** got stuck, either on a
+spinner or on "Use your Chromecast HD remote to go to settings" with a *Retry* button.
+
+The log showed the remote itself rejecting the new configuration (`3` = write not
+permitted):
+
+```
+Axel.BleConnection: Failed to write characteristic d343bfc1-5a21-4f05-bc7d-af01f617b664 to xx:xx:xx:xx:yy:zz: 3
+Axel.IrRemote: Upload '...' to xx:xx:xx:xx:yy:zz completed unsuccessfully
+```
+
+It still happened right after rebooting the Chromecast, before the watchdog had
+restarted Bluetooth even once, so the watchdog doesn't cause it.
+
+**Fix:** unpair the remote and pair it again (hold **Back + Home** until the light
+blinks), then run *Set up remote buttons* again. After re-pairing, the upload worked on
+the first try (`completed successfully`). During that wizard, use the Chromecast remote
+itself: it needs that remote's key presses.
+
+To check whether you're hitting this:
+
+```bash
+adb logcat -d | grep -E "Axel\.(IrRemote|BleConnection)"
+```
+
 ## Layout
 
 ```
